@@ -6,7 +6,6 @@ import { ScoreGauge } from "@/components/score-gauge"
 import { ProductAnalysis } from "@/components/product-analysis"
 import { HistoryTracker } from "@/components/history-tracker"
 import { ProductAlternatives } from "@/components/product-alternatives"
-import { notFound } from "next/navigation"
 
 interface PageProps {
   params: Promise<{ barcode: string }>
@@ -17,7 +16,31 @@ export default async function ProductPage({ params }: PageProps) {
   const product = await getProduct(barcode)
 
   if (!product) {
-    return notFound()
+    return (
+      <div className="bg-white min-h-screen flex flex-col items-center justify-center p-6 text-center">
+        <div className="w-16 h-16 rounded-full bg-gray-100 flex items-center justify-center mb-4">
+          <Info className="w-8 h-8 text-gray-400" />
+        </div>
+        <h1 className="text-2xl font-bold text-gray-900 mb-2">Product Not Found</h1>
+        <p className="text-gray-600 mb-6 max-w-sm">
+          The product with barcode <strong>{barcode}</strong> was not found in the Open Food Facts database.
+        </p>
+        <div className="space-y-3 w-full max-w-sm">
+          <Link
+            href="/scan"
+            className="block w-full px-6 py-3 bg-green-500 text-white rounded-xl font-semibold hover:bg-green-600 transition-colors"
+          >
+            Scan Another Product
+          </Link>
+          <Link
+            href="/search"
+            className="block w-full px-6 py-3 bg-gray-100 text-gray-900 rounded-xl font-semibold hover:bg-gray-200 transition-colors"
+          >
+            Search Products
+          </Link>
+        </div>
+      </div>
+    )
   }
 
   const { score, status } = calculateProductScore(product)
@@ -70,10 +93,11 @@ export default async function ProductPage({ params }: PageProps) {
         <div className="flex justify-between items-start mb-6">
           <div className="flex-1 pr-4">
             <h1 className="text-2xl font-bold text-gray-900 leading-tight mb-1">
-              {product.product_name || "Unknown Product"}
+              {product.product_name || `Product ${barcode}`}
             </h1>
             <p className="text-gray-500 font-medium">
-              {product.brands || "Unknown Brand"} • {product.quantity || "N/A"}
+              {product.brands || "Brand Unknown"}
+              {product.quantity && ` • ${product.quantity}`}
             </p>
           </div>
           <div className="shrink-0 pt-1">
@@ -104,7 +128,11 @@ export default async function ProductPage({ params }: PageProps) {
         <div className="mb-8">
           <h3 className="font-bold text-gray-900 mb-4 flex items-center gap-2">
             Analysis
-            <span className="text-xs font-normal text-gray-400 bg-gray-100 px-2 py-0.5 rounded-full">Computed</span>
+            {!product.nutriscore_grade && (
+              <span className="text-xs font-normal text-orange-500 bg-orange-50 px-2 py-0.5 rounded-full">
+                Limited Data
+              </span>
+            )}
           </h3>
           <ProductAnalysis product={product} />
         </div>

@@ -12,9 +12,12 @@ export function ProductAnalysis({ product }: ProductAnalysisProps) {
   const ns = product.nutriscore_grade?.toLowerCase()
   if (ns === "a") items.push({ type: "good", label: "Excellent nutritional quality", value: "Nutri-Score A" })
   else if (ns === "b") items.push({ type: "good", label: "Good nutritional quality", value: "Nutri-Score B" })
-  else if (ns === "c") items.push({ type: "neutral", label: "Poor nutritional quality", value: "Nutri-Score C" })
+  else if (ns === "c") items.push({ type: "neutral", label: "Average nutritional quality", value: "Nutri-Score C" })
   else if (ns === "d" || ns === "e")
-    items.push({ type: "bad", label: "Bad nutritional quality", value: `Nutri-Score ${ns.toUpperCase()}` })
+    items.push({ type: "bad", label: "Poor nutritional quality", value: `Nutri-Score ${ns.toUpperCase()}` })
+  else if (!ns && product.nutrient_levels) {
+    items.push({ type: "info", label: "Nutri-Score unavailable", value: "Using nutrient analysis" })
+  }
 
   const additivesCount = product.additives_n
   const additivesTags = product.additives_tags || []
@@ -24,14 +27,21 @@ export function ProductAnalysis({ product }: ProductAnalysisProps) {
       items.push({ type: "good", label: "No additives", value: "Clean label" })
     } else {
       const formattedAdditives = additivesTags
-        .map((tag) => tag.split(":")[1]?.toUpperCase())
+        .map((tag) => {
+          const code = tag.split(":")[1]?.toUpperCase()
+          return code
+        })
         .filter(Boolean)
+        .slice(0, 5) // Show max 5
         .join(", ")
+
+      const displayValue = formattedAdditives || "Additives detected"
+      const fullValue = additivesCount > 5 ? `${displayValue}... (+${additivesCount - 5} more)` : displayValue
 
       items.push({
         type: additivesCount > 3 ? "bad" : "neutral",
         label: additivesCount === 1 ? "1 additive" : `${additivesCount} additives`,
-        value: formattedAdditives || "Details unavailable",
+        value: fullValue,
       })
     }
   } else {
@@ -74,7 +84,11 @@ export function ProductAnalysis({ product }: ProductAnalysisProps) {
   }
 
   if (items.length === 0) {
-    return <div className="text-gray-500 italic text-sm">No detailed analysis available.</div>
+    return (
+      <div className="text-gray-500 italic text-sm bg-gray-50 p-4 rounded-xl border border-gray-100">
+        Limited product data available. This product may be new or incomplete in the database.
+      </div>
+    )
   }
 
   return (
