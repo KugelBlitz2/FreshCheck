@@ -1,4 +1,5 @@
-import { ChevronRight, User, Bell, Shield, HelpCircle, LogOut } from "lucide-react"
+import { ChevronRight, User, Bell, Shield, HelpCircle, LogOut, Smartphone } from "lucide-react"
+import Link from "next/link"
 
 export default function SettingsPage() {
   return (
@@ -21,6 +22,9 @@ export default function SettingsPage() {
         <section>
           <h3 className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-2 px-2">Application</h3>
           <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
+            <Link href="/settings/install">
+              <SettingsItem icon={Smartphone} label="Install App" />
+            </Link>
             <SettingsItem icon={Shield} label="Privacy & Security" />
             <SettingsItem icon={HelpCircle} label="Help & Support" />
           </div>
@@ -43,12 +47,12 @@ export default function SettingsPage() {
 
 function SettingsItem({ icon: Icon, label }: { icon: any; label: string }) {
   return (
-    <button className="w-full flex items-center justify-between p-4 hover:bg-gray-50 transition-colors border-b border-gray-50 last:border-0">
+    <div className="w-full flex items-center justify-between p-4 hover:bg-gray-50 transition-colors border-b border-gray-50 last:border-0 cursor-pointer">
       <div className="flex items-center gap-3">
         <Icon className="w-5 h-5 text-gray-400" />
         <span className="text-gray-700 font-medium">{label}</span>
       </div>
       <ChevronRight className="w-5 h-5 text-gray-300" />
-    </button>
+    </div>
   )
 }
