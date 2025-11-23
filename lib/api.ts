@@ -30,32 +30,24 @@ export async function searchProducts(query: string) {
 }
 
 export async function getProduct(barcode: string) {
-  const url = `${BASE_URL}/product/${barcode}.json?fields=code,product_name,brands,quantity,image_url,image_front_url,image_front_small_url,nutriscore_grade,ecoscore_grade,ingredients_text,additives_n,additives_tags,nutrient_levels,nutriments,nova_group,categories_tags,labels_tags,serving_size,packaging`
-  console.log(`[v0] Fetching product: ${barcode}`)
+  const url = `${BASE_URL}/product/${barcode}.json`
+  console.log(`[API] Fetching product: ${barcode}`)
 
   try {
     const response = await fetch(url, {
       headers: {
-        "User-Agent": "FreshCheck/1.0 (Mobile-Food-Scanner)",
+        "User-Agent": "YukaClone/1.0 (v0-demo-app)",
       },
     })
 
     if (!response.ok) {
-      console.log(`[v0] Product fetch failed with status: ${response.status}`)
       throw new Error("Network response was not ok")
     }
 
     const data = await response.json()
-
-    if (data.status === 0 || !data.product) {
-      console.log(`[v0] Product not found in database: ${barcode}`)
-      return null
-    }
-
-    console.log(`[v0] Product fetched successfully:`, data.product.product_name)
     return data.product
   } catch (error) {
-    console.error("[v0] Error fetching product:", error)
+    console.error("Error fetching product:", error)
     return null
   }
 }
@@ -91,42 +83,19 @@ export function calculateProductScore(product: any): { score: number; status: "E
   if (!product) return { score: 0, status: "Bad" }
 
   let baseScore = 50
-  let hasNutriScore = false
 
   // Nutri-Score impact (60% of weight usually)
   const nutriScore = product.nutriscore_grade?.toLowerCase()
-  if (nutriScore) {
-    hasNutriScore = true
-    if (nutriScore === "a") baseScore += 45
-    else if (nutriScore === "b") baseScore += 25
-    else if (nutriScore === "c") baseScore += 5
-    else if (nutriScore === "d") baseScore -= 15
-    else if (nutriScore === "e") baseScore -= 30
-  } else {
-    const levels = product.nutrient_levels
-    if (levels) {
-      let penaltyCount = 0
-      if (levels.sugars === "high") penaltyCount++
-      if (levels.salt === "high") penaltyCount++
-      if (levels["saturated-fat"] === "high") penaltyCount++
-      if (levels.fat === "high") penaltyCount++
-
-      baseScore -= penaltyCount * 10
-    }
-  }
+  if (nutriScore === "a") baseScore += 45
+  else if (nutriScore === "b") baseScore += 25
+  else if (nutriScore === "c") baseScore += 5
+  else if (nutriScore === "d") baseScore -= 15
+  else if (nutriScore === "e") baseScore -= 30
 
   // Additives impact (30% weight)
+  // Simplified: just check number of additives
   const additiveCount = product.additives_n || 0
-  if (additiveCount > 0) {
-    baseScore -= Math.min(additiveCount * 5, 25) // Cap at -25 for additives
-  }
-
-  // NOVA group penalty (ultra-processed foods)
-  if (product.nova_group === 4) {
-    baseScore -= 15
-  } else if (product.nova_group === 3) {
-    baseScore -= 5
-  }
+  baseScore -= additiveCount * 5
 
   // Organic bonus
   if (product.labels_tags?.includes("en:organic")) {
@@ -140,10 +109,6 @@ export function calculateProductScore(product: any): { score: number; status: "E
   if (finalScore >= 75) status = "Excellent"
   else if (finalScore >= 50) status = "Good"
   else if (finalScore >= 25) status = "Poor"
-
-  console.log(
-    `[v0] Score calculated: ${finalScore} (${status}) - hasNutriScore: ${hasNutriScore}, additives: ${additiveCount}`,
-  )
 
   return { score: finalScore, status }
 }
