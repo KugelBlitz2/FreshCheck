@@ -1,27 +1,149 @@
 "use client"
 
 import type React from "react"
-import { useState, useEffect } from "react"
+import { useState, useEffect, useRef } from "react"
 import { useRouter } from "next/navigation"
 import { ArrowLeft, Barcode, Camera, Zap } from "lucide-react"
 import Link from "next/link"
+import { BrowserMultiFormatReader } from "@zxing/library"
 
 export default function ScanPage() {
   const [barcode, setBarcode] = useState("")
-  const [isScanning, setIsScanning] = useState(true)
+  const [isScanning, setIsScanning] = useState(false)
+  const [flashEnabled, setFlashEnabled] = useState(false)
+  const [cameraEnabled, setCameraEnabled] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+  const videoRef = useRef<HTMLVideoElement>(null)
+  const canvasRef = useRef<HTMLCanvasElement>(null)
+  const streamRef = useRef<MediaStream | null>(null)
+  const codeReader = useRef(new BrowserMultiFormatReader())
   const router = useRouter()
 
-  // Added effect to simulate scanning activity
   useEffect(() => {
-    const timer = setInterval(() => {
-      setIsScanning((prev) => !prev)
-    }, 2000)
-    return () => clearInterval(timer)
+    startCamera()
+    return () => {
+      stopCamera()
+    }
   }, [])
+
+  const startCamera = async () => {
+    try {
+      setError(null)
+      let stream: MediaStream | null = null
+
+      try {
+        stream = await navigator.mediaDevices.getUserMedia({
+          video: { facingMode: "environment", width: { ideal: 1280 }, height: { ideal: 720 } },
+        })
+      } catch (err) {
+        console.warn("Environment camera not found, trying any video source...")
+        stream = await navigator.mediaDevices.getUserMedia({
+          video: true,
+        })
+      }
+
+      if (stream && videoRef.current) {
+        videoRef.current.srcObject = stream
+        streamRef.current = stream
+
+        videoRef.current.onloadedmetadata = () => {
+          setCameraEnabled(true)
+          setIsScanning(true)
+        }
+      }
+    } catch (err) {
+      setError("Camera access denied. Please enable camera permissions or use manual entry.")
+      setCameraEnabled(false)
+    }
+  }
+
+  const stopCamera = () => {
+    if (streamRef.current) {
+      streamRef.current.getTracks().forEach((track) => track.stop())
+      streamRef.current = null
+    }
+    setCameraEnabled(false)
+    setIsScanning(false)
+  }
+
+  const toggleFlash = async () => {
+    if (streamRef.current) {
+      const track = streamRef.current.getVideoTracks()[0]
+      const capabilities = track.getCapabilities() as any
+
+      if (capabilities.torch) {
+        try {
+          await track.applyConstraints({
+            // @ts-ignore
+            advanced: [{ torch: !flashEnabled }],
+          })
+          setFlashEnabled(!flashEnabled)
+        } catch (err) {
+          console.error("[v0] Flash toggle error:", err)
+        }
+      }
+    }
+  }
+
+  useEffect(() => {
+    if (!isScanning || !videoRef.current || !canvasRef.current) return
+
+    let animationId: number
+    const detectBarcode = async () => {
+      if (videoRef.current && canvasRef.current && videoRef.current.readyState === videoRef.current.HAVE_ENOUGH_DATA) {
+        const canvas = canvasRef.current
+        const video = videoRef.current
+        const ctx = canvas.getContext("2d")
+
+        if (ctx) {
+          canvas.width = video.videoWidth
+          canvas.height = video.videoHeight
+          ctx.drawImage(video, 0, 0, canvas.width, canvas.height)
+
+          if ("BarcodeDetector" in window) {
+            try {
+              const barcodeDetector = new (window as any).BarcodeDetector({
+                formats: ["ean_13", "ean_8", "upc_a", "upc_e", "code_128", "code_39"],
+              })
+              const barcodes = await barcodeDetector.detect(canvas)
+
+              if (barcodes.length > 0) {
+                const detectedCode = barcodes[0].rawValue
+                setIsScanning(false)
+                stopCamera()
+                router.push(`/product/${detectedCode}`)
+                return
+              }
+            } catch (err) {}
+          }
+
+          try {
+            const result = await codeReader.current.decodeFromImage(undefined, canvas.toDataURL())
+            if (result) {
+              const detectedCode = result.getText()
+              setIsScanning(false)
+              stopCamera()
+              router.push(`/product/${detectedCode}`)
+              return
+            }
+          } catch (err) {}
+        }
+      }
+
+      animationId = requestAnimationFrame(detectBarcode)
+    }
+
+    detectBarcode()
+
+    return () => {
+      if (animationId) cancelAnimationFrame(animationId)
+    }
+  }, [isScanning, router])
 
   const handleManualSubmit = (e: React.FormEvent) => {
     e.preventDefault()
     if (barcode.trim()) {
+      stopCamera()
       router.push(`/product/${barcode}`)
     }
   }
@@ -35,7 +157,8 @@ export default function ScanPage() {
 
   return (
     <div className="flex flex-col h-full bg-black text-white relative">
-      {/* Overlay UI */}
+      <canvas ref={canvasRef} className="hidden" />
+
       <div className="absolute top-0 left-0 right-0 p-4 z-20 flex justify-between items-start bg-gradient-to-b from-black/80 to-transparent pt-12">
         <Link
           href="/"
@@ -44,40 +167,52 @@ export default function ScanPage() {
           <ArrowLeft className="w-6 h-6" />
         </Link>
         <div className="flex gap-4">
-          <button className="p-2 bg-black/40 backdrop-blur-md rounded-full text-white/90 hover:bg-black/60 transition-colors">
+          <button
+            onClick={toggleFlash}
+            className={`p-2 backdrop-blur-md rounded-full transition-colors ${
+              flashEnabled ? "bg-yellow-500/60 text-white" : "bg-black/40 text-white/90 hover:bg-black/60"
+            }`}
+          >
             <Zap className="w-6 h-6" />
           </button>
-          <button className="p-2 bg-black/40 backdrop-blur-md rounded-full text-white/90 hover:bg-black/60 transition-colors">
+          <button
+            onClick={() => (cameraEnabled ? stopCamera() : startCamera())}
+            className={`p-2 backdrop-blur-md rounded-full transition-colors ${
+              cameraEnabled ? "bg-green-500/60 text-white" : "bg-black/40 text-white/90 hover:bg-black/60"
+            }`}
+          >
             <Camera className="w-6 h-6" />
           </button>
         </div>
       </div>
 
-      {/* Simulated Camera View */}
       <div className="flex-1 flex flex-col items-center justify-center relative overflow-hidden bg-gray-900">
-        <div className="absolute inset-0 opacity-40 bg-[url('https://images.unsplash.com/photo-1542838132-92c53300491e?q=80&w=2574&auto=format&fit=crop')] bg-cover bg-center"></div>
+        <video ref={videoRef} autoPlay playsInline muted className="absolute inset-0 w-full h-full object-cover" />
 
-        {/* Dark overlay with cutout */}
         <div className="absolute inset-0 bg-black/30 backdrop-blur-[1px]"></div>
 
-        {/* Scanning Frame */}
         <div className="relative w-72 h-48 rounded-2xl flex items-center justify-center z-10 overflow-hidden shadow-[0_0_0_9999px_rgba(0,0,0,0.5)]">
-          {/* Corners */}
           <div className="absolute top-0 left-0 w-8 h-8 border-t-4 border-l-4 border-white rounded-tl-xl"></div>
           <div className="absolute top-0 right-0 w-8 h-8 border-t-4 border-r-4 border-white rounded-tr-xl"></div>
           <div className="absolute bottom-0 left-0 w-8 h-8 border-b-4 border-l-4 border-white rounded-bl-xl"></div>
           <div className="absolute bottom-0 right-0 w-8 h-8 border-b-4 border-r-4 border-white rounded-br-xl"></div>
 
-          {/* Laser Line */}
-          <div className="w-[120%] h-[2px] bg-red-500 shadow-[0_0_15px_rgba(239,68,68,1)] animate-[scan_1.5s_ease-in-out_infinite]"></div>
+          {isScanning && (
+            <div className="w-[120%] h-[2px] bg-red-500 shadow-[0_0_15px_rgba(239,68,68,1)] animate-[scan_1.5s_ease-in-out_infinite]"></div>
+          )}
         </div>
 
         <p className="absolute bottom-40 z-10 text-white/90 font-medium bg-black/40 px-4 py-1 rounded-full backdrop-blur-sm">
-          Scanning for barcode...
+          {error ? "Camera unavailable" : cameraEnabled ? "Point at barcode..." : "Starting camera..."}
         </p>
+
+        {error && (
+          <div className="absolute top-32 left-4 right-4 z-10 bg-red-500/90 text-white p-4 rounded-xl text-sm">
+            {error}
+          </div>
+        )}
       </div>
 
-      {/* Bottom Sheet */}
       <div className="bg-white text-black rounded-t-3xl p-6 pb-24 -mt-6 relative z-10 min-h-[40vh] shadow-[0_-10px_40px_rgba(0,0,0,0.2)]">
         <div className="w-12 h-1.5 bg-gray-200 rounded-full mx-auto mb-8"></div>
 
