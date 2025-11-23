@@ -1,6 +1,6 @@
 {
-  "name": "Yuka Food Scanner",
-  "short_name": "Yuka",
+  "name": "FreshCheck Food Scanner",
+  "short_name": "FreshCheck",
   "description": "Scan and analyze food products for health information",
   "start_url": "/",
   "display": "standalone",

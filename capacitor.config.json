@@ -1,6 +1,6 @@
 {
-  "appId": "com.yuka.clone",
-  "appName": "Yuka Clone",
+  "appId": "com.freshcheck.app",
+  "appName": "FreshCheck",
   "webDir": "out",
   "server": {
     "androidScheme": "https"

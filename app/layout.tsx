@@ -9,14 +9,14 @@ const _geist = Geist({ subsets: ["latin"] })
 const _geistMono = Geist_Mono({ subsets: ["latin"] })
 
 export const metadata: Metadata = {
-  title: "Yuka Clone - Food Scanner",
-  description: "Scan and analyze food products with health scores",
+  title: "FreshCheck - Food Scanner",
+  description: "Scan and analyze food products with health scores and nutritional information",
   generator: "v0.app",
   manifest: "/manifest.json",
   appleWebApp: {
     capable: true,
     statusBarStyle: "default",
-    title: "Yuka Clone",
+    title: "FreshCheck",
   },
   formatDetection: {
     telephone: false,
@@ -36,7 +36,7 @@ export const metadata: Metadata = {
         type: "image/svg+xml",
       },
     ],
-    apple: "/icon.svg", // Fallback to SVG if PNGs aren't generated
+    apple: "/icon.svg",
   },
 }
 
