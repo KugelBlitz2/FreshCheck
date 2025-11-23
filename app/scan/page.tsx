@@ -3,7 +3,7 @@
 import type React from "react"
 import { useState, useEffect, useRef } from "react"
 import { useRouter } from "next/navigation"
-import { ArrowLeft, Barcode, Camera, Zap, AlertTriangle, ExternalLink } from "lucide-react"
+import { ArrowLeft, Barcode, Camera, Zap, AlertTriangle } from "lucide-react"
 import Link from "next/link"
 import { BrowserMultiFormatReader } from "@zxing/library"
 
@@ -14,7 +14,6 @@ export default function ScanPage() {
   const [cameraEnabled, setCameraEnabled] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [scanAttempts, setScanAttempts] = useState(0)
-  const [lastScannedCode, setLastScannedCode] = useState<string | null>(null)
   const videoRef = useRef<HTMLVideoElement>(null)
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const streamRef = useRef<MediaStream | null>(null)
@@ -31,7 +30,7 @@ export default function ScanPage() {
   const startCamera = async () => {
     try {
       setError(null)
-      setScanAttempts(0)
+      setScanAttempts(0) // Reset attempts on camera start
       let stream: MediaStream | null = null
 
       try {
@@ -121,20 +120,17 @@ export default function ScanPage() {
           if ("BarcodeDetector" in window) {
             try {
               const barcodeDetector = new (window as any).BarcodeDetector({
-                formats: ["ean_13", "ean_8", "upc_a", "upc_e", "code_128", "code_39", "itf", "code_93"],
+                formats: ["ean_13", "ean_8", "upc_a", "upc_e", "code_128", "code_39"],
               })
               const barcodes = await barcodeDetector.detect(canvas)
 
               if (barcodes.length > 0) {
                 const detectedCode = barcodes[0].rawValue
-                if (detectedCode !== lastScannedCode) {
-                  console.log("[v0] Barcode detected:", detectedCode)
-                  setLastScannedCode(detectedCode)
-                  setIsScanning(false)
-                  stopCamera()
-                  router.push(`/product/${detectedCode}`)
-                  return
-                }
+                console.log("[v0] Barcode detected:", detectedCode)
+                setIsScanning(false)
+                stopCamera()
+                router.push(`/product/${detectedCode}`)
+                return
               }
             } catch (err) {
               console.error("[v0] BarcodeDetector error:", err)
@@ -145,14 +141,11 @@ export default function ScanPage() {
             const result = await codeReader.current.decodeFromImage(undefined, canvas.toDataURL())
             if (result) {
               const detectedCode = result.getText()
-              if (detectedCode !== lastScannedCode) {
-                console.log("[v0] Barcode detected (ZXing):", detectedCode)
-                setLastScannedCode(detectedCode)
-                setIsScanning(false)
-                stopCamera()
-                router.push(`/product/${detectedCode}`)
-                return
-              }
+              console.log("[v0] Barcode detected (ZXing):", detectedCode)
+              setIsScanning(false)
+              stopCamera()
+              router.push(`/product/${detectedCode}`)
+              return
             }
           } catch (err) {
             if (err && (err as any).name !== "NotFoundException") {
@@ -170,7 +163,7 @@ export default function ScanPage() {
     return () => {
       if (animationId) cancelAnimationFrame(animationId)
     }
-  }, [isScanning, router, lastScannedCode])
+  }, [isScanning, router])
 
   const handleManualSubmit = (e: React.FormEvent) => {
     e.preventDefault()
@@ -289,22 +282,13 @@ export default function ScanPage() {
 
         {scanAttempts > 50 && (
           <div className="mb-6 p-4 bg-amber-50 border border-amber-200 rounded-xl">
-            <p className="text-sm text-amber-900 font-semibold mb-2">Scanning Tips</p>
-            <ul className="text-xs text-amber-800 space-y-1 mb-3">
+            <p className="text-sm text-amber-900 font-semibold mb-1">Scanning Tips</p>
+            <ul className="text-xs text-amber-800 space-y-1">
               <li>• Ensure good lighting on the barcode</li>
               <li>• Hold steady and keep barcode flat</li>
               <li>• Try cleaning the camera lens</li>
               <li>• Use manual entry if barcode is damaged</li>
             </ul>
-            <a
-              href="https://world.openfoodfacts.org/cgi/product.pl"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="flex items-center gap-2 text-xs text-green-700 font-semibold hover:text-green-800 transition-colors"
-            >
-              Product not in database? Add it to Open Food Facts
-              <ExternalLink className="w-3 h-3" />
-            </a>
           </div>
         )}
 
