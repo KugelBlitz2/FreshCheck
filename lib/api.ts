@@ -30,7 +30,7 @@ export async function searchProducts(query: string) {
 }
 
 export async function getProduct(barcode: string) {
-  const url = `${BASE_URL}/product/${barcode}.json?fields=code,product_name,brands,quantity,image_url,image_front_url,nutriscore_grade,ecoscore_grade,ingredients_text,additives_n,additives_tags,nutrient_levels,nutriments,nova_group,categories_tags,labels_tags,serving_size,packaging`
+  const url = `${BASE_URL}/product/${barcode}.json?fields=code,product_name,brands,quantity,image_url,image_front_url,image_front_small_url,nutriscore_grade,ecoscore_grade,ingredients_text,additives_n,additives_tags,nutrient_levels,nutriments,nova_group,categories_tags,labels_tags,serving_size,packaging`
   console.log(`[v0] Fetching product: ${barcode}`)
 
   try {
