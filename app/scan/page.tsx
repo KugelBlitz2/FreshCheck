@@ -33,7 +33,7 @@ export default function ScanPage() {
 
       try {
         stream = await navigator.mediaDevices.getUserMedia({
-          video: { facingMode: "environment", width: { ideal: 1280 }, height: { ideal: 720 } },
+          video: { facingMode: "environment", width: { ideal: 1920 }, height: { ideal: 1080 } },
         })
       } catch (err) {
         console.warn("Environment camera not found, trying any video source...")
@@ -89,7 +89,19 @@ export default function ScanPage() {
     if (!isScanning || !videoRef.current || !canvasRef.current) return
 
     let animationId: number
+    let lastScanTime = 0
+    const SCAN_INTERVAL = 100 // scan every 100ms instead of every frame
+
     const detectBarcode = async () => {
+      const now = Date.now()
+
+      if (now - lastScanTime < SCAN_INTERVAL) {
+        animationId = requestAnimationFrame(detectBarcode)
+        return
+      }
+
+      lastScanTime = now
+
       if (videoRef.current && canvasRef.current && videoRef.current.readyState === videoRef.current.HAVE_ENOUGH_DATA) {
         const canvas = canvasRef.current
         const video = videoRef.current
@@ -159,17 +171,17 @@ export default function ScanPage() {
     <div className="flex flex-col h-full bg-black text-white relative">
       <canvas ref={canvasRef} className="hidden" />
 
-      <div className="absolute top-0 left-0 right-0 p-4 z-20 flex justify-between items-start bg-gradient-to-b from-black/80 to-transparent pt-12">
+      <div className="absolute top-0 left-0 right-0 p-4 z-20 flex justify-between items-start bg-gradient-to-b from-black/80 to-transparent pt-safe-top">
         <Link
           href="/"
-          className="p-2 bg-black/40 backdrop-blur-md rounded-full text-white/90 hover:bg-black/60 transition-colors"
+          className="p-3 bg-black/40 backdrop-blur-md rounded-full text-white/90 hover:bg-black/60 transition-colors"
         >
           <ArrowLeft className="w-6 h-6" />
         </Link>
-        <div className="flex gap-4">
+        <div className="flex gap-3">
           <button
             onClick={toggleFlash}
-            className={`p-2 backdrop-blur-md rounded-full transition-colors ${
+            className={`p-3 backdrop-blur-md rounded-full transition-colors ${
               flashEnabled ? "bg-yellow-500/60 text-white" : "bg-black/40 text-white/90 hover:bg-black/60"
             }`}
           >
@@ -177,7 +189,7 @@ export default function ScanPage() {
           </button>
           <button
             onClick={() => (cameraEnabled ? stopCamera() : startCamera())}
-            className={`p-2 backdrop-blur-md rounded-full transition-colors ${
+            className={`p-3 backdrop-blur-md rounded-full transition-colors ${
               cameraEnabled ? "bg-green-500/60 text-white" : "bg-black/40 text-white/90 hover:bg-black/60"
             }`}
           >
@@ -191,18 +203,18 @@ export default function ScanPage() {
 
         <div className="absolute inset-0 bg-black/30 backdrop-blur-[1px]"></div>
 
-        <div className="relative w-72 h-48 rounded-2xl flex items-center justify-center z-10 overflow-hidden shadow-[0_0_0_9999px_rgba(0,0,0,0.5)]">
-          <div className="absolute top-0 left-0 w-8 h-8 border-t-4 border-l-4 border-white rounded-tl-xl"></div>
-          <div className="absolute top-0 right-0 w-8 h-8 border-t-4 border-r-4 border-white rounded-tr-xl"></div>
-          <div className="absolute bottom-0 left-0 w-8 h-8 border-b-4 border-l-4 border-white rounded-bl-xl"></div>
-          <div className="absolute bottom-0 right-0 w-8 h-8 border-b-4 border-r-4 border-white rounded-br-xl"></div>
+        <div className="relative w-80 h-64 rounded-2xl flex items-center justify-center z-10 overflow-hidden shadow-[0_0_0_9999px_rgba(0,0,0,0.5)]">
+          <div className="absolute top-0 left-0 w-10 h-10 border-t-4 border-l-4 border-white rounded-tl-xl"></div>
+          <div className="absolute top-0 right-0 w-10 h-10 border-t-4 border-r-4 border-white rounded-tr-xl"></div>
+          <div className="absolute bottom-0 left-0 w-10 h-10 border-b-4 border-l-4 border-white rounded-bl-xl"></div>
+          <div className="absolute bottom-0 right-0 w-10 h-10 border-b-4 border-r-4 border-white rounded-br-xl"></div>
 
           {isScanning && (
             <div className="w-[120%] h-[2px] bg-red-500 shadow-[0_0_15px_rgba(239,68,68,1)] animate-[scan_1.5s_ease-in-out_infinite]"></div>
           )}
         </div>
 
-        <p className="absolute bottom-40 z-10 text-white/90 font-medium bg-black/40 px-4 py-1 rounded-full backdrop-blur-sm">
+        <p className="absolute bottom-40 z-10 text-white/90 font-medium bg-black/40 px-4 py-2 rounded-full backdrop-blur-sm text-base">
           {error ? "Camera unavailable" : cameraEnabled ? "Point at barcode..." : "Starting camera..."}
         </p>
 
