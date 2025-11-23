@@ -1,6 +1,14 @@
 const BASE_URL = "https://world.openfoodfacts.org/api/v2"
 const SEARCH_URL = "https://world.openfoodfacts.org/cgi/search.pl"
 
+// Regional databases to try as fallbacks
+const REGIONAL_DATABASES = [
+  "https://world.openfoodfacts.org",
+  "https://us.openfoodfacts.org",
+  "https://au.openfoodfacts.org",
+  "https://uk.openfoodfacts.org",
+]
+
 export async function searchProducts(query: string) {
   if (!query) return []
 
@@ -11,7 +19,7 @@ export async function searchProducts(query: string) {
   try {
     const response = await fetch(url, {
       headers: {
-        "User-Agent": "YukaClone/1.0 (v0-demo-app)",
+        "User-Agent": "FreshCheck/1.0 (nutrition-scanner)",
       },
     })
 
@@ -30,36 +38,80 @@ export async function searchProducts(query: string) {
 }
 
 export async function getProduct(barcode: string) {
-  const url = `${BASE_URL}/product/${barcode}.json?fields=code,product_name,brands,image_url,image_front_small_url,nutriscore_grade,ecoscore_grade,nova_group,nutrient_levels,nutriments,ingredients_text,additives_n,additives_tags,categories_tags,quantity,labels_tags`
-  console.log(`[API] Fetching product: ${barcode}`)
+  // Clean up barcode - remove spaces and dashes
+  const cleanBarcode = barcode.replace(/[\s-]/g, "")
+
+  console.log(`[API] Fetching product: ${cleanBarcode}`)
+
+  // Try primary database first
+  let result = await tryFetchProduct(cleanBarcode, BASE_URL)
+  if (result) return result
+
+  console.log(`[API] Product not found in primary database, trying regional databases...`)
+
+  // Try regional databases as fallback
+  for (const dbUrl of REGIONAL_DATABASES) {
+    if (dbUrl === "https://world.openfoodfacts.org") continue // Already tried
+
+    console.log(`[API] Trying ${dbUrl}...`)
+    result = await tryFetchProduct(cleanBarcode, `${dbUrl}/api/v2`)
+    if (result) {
+      console.log(`[API] Product found in ${dbUrl}!`)
+      return result
+    }
+  }
+
+  if (cleanBarcode.length < 13) {
+    const paddedBarcode = cleanBarcode.padStart(13, "0")
+    console.log(`[API] Trying padded barcode: ${paddedBarcode}`)
+    result = await tryFetchProduct(paddedBarcode, BASE_URL)
+    if (result) return result
+  }
+
+  if (cleanBarcode.startsWith("0") && cleanBarcode.length > 8) {
+    const trimmedBarcode = cleanBarcode.replace(/^0+/, "")
+    console.log(`[API] Trying trimmed barcode: ${trimmedBarcode}`)
+    result = await tryFetchProduct(trimmedBarcode, BASE_URL)
+    if (result) return result
+  }
+
+  console.log(`[API] Product ${cleanBarcode} not found in any database`)
+  return null
+}
+
+async function tryFetchProduct(barcode: string, baseUrl: string) {
+  const url = `${baseUrl}/product/${barcode}.json?fields=code,product_name,brands,image_url,image_front_small_url,nutriscore_grade,ecoscore_grade,nova_group,nutrient_levels,nutriments,ingredients_text,additives_n,additives_tags,categories_tags,quantity,labels_tags`
 
   try {
     const response = await fetch(url, {
       headers: {
-        "User-Agent": "YukaClone/1.0 (v0-demo-app)",
+        "User-Agent": "FreshCheck/1.0 (nutrition-scanner)",
       },
+      signal: AbortSignal.timeout(5000),
     })
 
     if (!response.ok) {
       if (response.status === 404) {
-        console.log(`[API] Product ${barcode} not found in database`)
         return null
       }
-      console.error(`[API] Failed to fetch product: ${response.status}`)
-      throw new Error(`HTTP error! status: ${response.status}`)
+      console.error(`[API] Failed to fetch from ${baseUrl}: ${response.status}`)
+      return null
     }
 
     const data = await response.json()
 
     if (data.status === 0 || !data.product) {
-      console.log(`[API] Product ${barcode} not found (status: ${data.status})`)
       return null
     }
 
     console.log(`[API] Successfully fetched product: ${data.product.product_name || "Unknown"}`)
     return data.product
   } catch (error) {
-    console.error("[API] Error fetching product:", error)
+    if (error instanceof Error && error.name === "TimeoutError") {
+      console.error(`[API] Request timeout for ${baseUrl}`)
+    } else {
+      console.error(`[API] Error fetching from ${baseUrl}:`, error)
+    }
     return null
   }
 }
@@ -74,7 +126,7 @@ export async function getAlternatives(categoryTag: string) {
   try {
     const response = await fetch(url, {
       headers: {
-        "User-Agent": "YukaClone/1.0 (v0-demo-app)",
+        "User-Agent": "FreshCheck/1.0 (nutrition-scanner)",
       },
     })
 

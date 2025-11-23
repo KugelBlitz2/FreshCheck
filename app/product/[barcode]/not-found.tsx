@@ -1,5 +1,5 @@
 import Link from "next/link"
-import { Search, Scan, AlertCircle } from "lucide-react"
+import { Search, Scan, AlertCircle, ExternalLink, Plus } from "lucide-react"
 
 export default function ProductNotFound() {
   return (
@@ -39,12 +39,34 @@ export default function ProductNotFound() {
         </Link>
       </div>
 
-      <div className="mt-10 p-4 bg-blue-50 rounded-xl max-w-md">
-        <p className="text-sm text-blue-900 font-medium mb-2">Did you know?</p>
-        <p className="text-xs text-blue-700">
-          Our database contains millions of products, but some regional or new items may not be available yet. You can
-          try searching by the product name instead.
+      <div className="mt-8 p-5 bg-gradient-to-br from-green-50 to-emerald-50 rounded-xl max-w-md border border-green-100">
+        <div className="flex items-center justify-center gap-2 mb-3">
+          <Plus className="w-5 h-5 text-green-600" />
+          <p className="text-base text-green-900 font-bold">Help Us Grow</p>
+        </div>
+        <p className="text-sm text-green-800 mb-4">
+          You can add this product to Open Food Facts, a free and open database used by FreshCheck and millions of users
+          worldwide.
         </p>
+        <a
+          href="https://world.openfoodfacts.org/cgi/product.pl"
+          target="_blank"
+          rel="noopener noreferrer"
+          className="inline-flex items-center justify-center gap-2 w-full bg-green-600 text-white py-3 px-4 rounded-lg font-semibold hover:bg-green-700 transition-colors text-sm"
+        >
+          Add Product to Database
+          <ExternalLink className="w-4 h-4" />
+        </a>
+      </div>
+
+      <div className="mt-6 p-4 bg-blue-50 rounded-xl max-w-md">
+        <p className="text-sm text-blue-900 font-medium mb-2">Why might a product be missing?</p>
+        <ul className="text-xs text-blue-700 text-left space-y-1">
+          <li>• Regional or local products not yet added</li>
+          <li>• Recently launched items</li>
+          <li>• Store brands or private labels</li>
+          <li>• Products from smaller manufacturers</li>
+        </ul>
       </div>
     </div>
   )
