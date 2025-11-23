@@ -4,8 +4,7 @@ const SEARCH_URL = "https://world.openfoodfacts.org/cgi/search.pl"
 export async function searchProducts(query: string) {
   if (!query) return []
 
-  // Using the CGI search endpoint as it's often more reliable for general text search parameters
-  const url = `${SEARCH_URL}?search_terms=${encodeURIComponent(query)}&search_simple=1&action=process&json=1&page_size=20`
+  const url = `${SEARCH_URL}?search_terms=${encodeURIComponent(query)}&search_simple=1&action=process&json=1&page_size=20&fields=code,product_name,brands,image_url,image_front_small_url,nutriscore_grade,nova_group`
 
   console.log(`[API] Searching for: ${query}`)
 
@@ -17,6 +16,7 @@ export async function searchProducts(query: string) {
     })
 
     if (!response.ok) {
+      console.error(`[API] Search failed with status ${response.status}`)
       throw new Error("Network response was not ok")
     }
 
@@ -24,13 +24,13 @@ export async function searchProducts(query: string) {
     console.log(`[API] Found ${data.products?.length || 0} results`)
     return data.products || []
   } catch (error) {
-    console.error("Error searching products:", error)
+    console.error("[API] Error searching products:", error)
     return []
   }
 }
 
 export async function getProduct(barcode: string) {
-  const url = `${BASE_URL}/product/${barcode}.json`
+  const url = `${BASE_URL}/product/${barcode}.json?fields=code,product_name,brands,image_url,image_front_small_url,nutriscore_grade,ecoscore_grade,nova_group,nutrient_levels,nutriments,ingredients_text,additives_n,additives_tags,categories_tags,quantity,labels_tags`
   console.log(`[API] Fetching product: ${barcode}`)
 
   try {
@@ -41,13 +41,25 @@ export async function getProduct(barcode: string) {
     })
 
     if (!response.ok) {
-      throw new Error("Network response was not ok")
+      if (response.status === 404) {
+        console.log(`[API] Product ${barcode} not found in database`)
+        return null
+      }
+      console.error(`[API] Failed to fetch product: ${response.status}`)
+      throw new Error(`HTTP error! status: ${response.status}`)
     }
 
     const data = await response.json()
+
+    if (data.status === 0 || !data.product) {
+      console.log(`[API] Product ${barcode} not found (status: ${data.status})`)
+      return null
+    }
+
+    console.log(`[API] Successfully fetched product: ${data.product.product_name || "Unknown"}`)
     return data.product
   } catch (error) {
-    console.error("Error fetching product:", error)
+    console.error("[API] Error fetching product:", error)
     return null
   }
 }
@@ -55,7 +67,6 @@ export async function getProduct(barcode: string) {
 export async function getAlternatives(categoryTag: string) {
   if (!categoryTag) return []
 
-  // Search for products in the same category, sorted by Nutri-Score, ensuring they have an image and product name
   const url = `${SEARCH_URL}?action=process&categories_tags=${encodeURIComponent(categoryTag)}&sort_by=nutriscore_score&page_size=5&json=1&fields=code,product_name,brands,image_url,nutriscore_grade,nova_group`
 
   console.log(`[API] Fetching alternatives for category: ${categoryTag}`)
@@ -77,14 +88,11 @@ export async function getAlternatives(categoryTag: string) {
   }
 }
 
-// Helper to calculate a "Yuka-like" score (0-100) based on Nutri-Score and additives
-// This is a simplified approximation as the real algorithm is complex
 export function calculateProductScore(product: any): { score: number; status: "Excellent" | "Good" | "Poor" | "Bad" } {
   if (!product) return { score: 0, status: "Bad" }
 
   let baseScore = 50
 
-  // Nutri-Score impact (60% of weight usually)
   const nutriScore = product.nutriscore_grade?.toLowerCase()
   if (nutriScore === "a") baseScore += 45
   else if (nutriScore === "b") baseScore += 25
@@ -92,17 +100,13 @@ export function calculateProductScore(product: any): { score: number; status: "E
   else if (nutriScore === "d") baseScore -= 15
   else if (nutriScore === "e") baseScore -= 30
 
-  // Additives impact (30% weight)
-  // Simplified: just check number of additives
   const additiveCount = product.additives_n || 0
   baseScore -= additiveCount * 5
 
-  // Organic bonus
   if (product.labels_tags?.includes("en:organic")) {
     baseScore += 10
   }
 
-  // Clamp score
   const finalScore = Math.max(0, Math.min(100, baseScore))
 
   let status: "Excellent" | "Good" | "Poor" | "Bad" = "Bad"
