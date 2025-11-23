@@ -14,18 +14,22 @@ interface PageProps {
 
 export default async function ProductPage({ params }: PageProps) {
   const { barcode } = await params
+
+  console.log(`[v0] Loading product page for barcode: ${barcode}`)
   const product = await getProduct(barcode)
 
   if (!product) {
+    console.log(`[v0] Product ${barcode} not found, showing not-found page`)
     return notFound()
   }
+
+  console.log(`[v0] Product loaded: ${product.product_name}`)
 
   const { score, status } = calculateProductScore(product)
   const colorHex = getScoreColorHex(score)
 
   let alternatives = []
   if (score < 75 && product.categories_tags && product.categories_tags.length > 0) {
-    // Try to find a good category tag, preferring the last one (most specific)
     const category = product.categories_tags[product.categories_tags.length - 1]
     alternatives = await getAlternatives(category)
   }

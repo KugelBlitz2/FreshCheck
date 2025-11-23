@@ -3,7 +3,7 @@
 import type React from "react"
 import { useState, useEffect, useRef } from "react"
 import { useRouter } from "next/navigation"
-import { ArrowLeft, Barcode, Camera, Zap } from "lucide-react"
+import { ArrowLeft, Barcode, Camera, Zap, AlertTriangle } from "lucide-react"
 import Link from "next/link"
 import { BrowserMultiFormatReader } from "@zxing/library"
 
@@ -13,6 +13,7 @@ export default function ScanPage() {
   const [flashEnabled, setFlashEnabled] = useState(false)
   const [cameraEnabled, setCameraEnabled] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [scanAttempts, setScanAttempts] = useState(0)
   const videoRef = useRef<HTMLVideoElement>(null)
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const streamRef = useRef<MediaStream | null>(null)
@@ -29,6 +30,7 @@ export default function ScanPage() {
   const startCamera = async () => {
     try {
       setError(null)
+      setScanAttempts(0) // Reset attempts on camera start
       let stream: MediaStream | null = null
 
       try {
@@ -36,7 +38,7 @@ export default function ScanPage() {
           video: { facingMode: "environment", width: { ideal: 1920 }, height: { ideal: 1080 } },
         })
       } catch (err) {
-        console.warn("Environment camera not found, trying any video source...")
+        console.warn("[v0] Environment camera not found, trying any video source...")
         stream = await navigator.mediaDevices.getUserMedia({
           video: true,
         })
@@ -52,7 +54,8 @@ export default function ScanPage() {
         }
       }
     } catch (err) {
-      setError("Camera access denied. Please enable camera permissions or use manual entry.")
+      console.error("[v0] Camera access error:", err)
+      setError("Camera access denied. Please enable camera permissions in your browser settings.")
       setCameraEnabled(false)
     }
   }
@@ -90,7 +93,7 @@ export default function ScanPage() {
 
     let animationId: number
     let lastScanTime = 0
-    const SCAN_INTERVAL = 100 // scan every 100ms instead of every frame
+    const SCAN_INTERVAL = 100
 
     const detectBarcode = async () => {
       const now = Date.now()
@@ -112,6 +115,8 @@ export default function ScanPage() {
           canvas.height = video.videoHeight
           ctx.drawImage(video, 0, 0, canvas.width, canvas.height)
 
+          setScanAttempts((prev) => prev + 1)
+
           if ("BarcodeDetector" in window) {
             try {
               const barcodeDetector = new (window as any).BarcodeDetector({
@@ -121,24 +126,32 @@ export default function ScanPage() {
 
               if (barcodes.length > 0) {
                 const detectedCode = barcodes[0].rawValue
+                console.log("[v0] Barcode detected:", detectedCode)
                 setIsScanning(false)
                 stopCamera()
                 router.push(`/product/${detectedCode}`)
                 return
               }
-            } catch (err) {}
+            } catch (err) {
+              console.error("[v0] BarcodeDetector error:", err)
+            }
           }
 
           try {
             const result = await codeReader.current.decodeFromImage(undefined, canvas.toDataURL())
             if (result) {
               const detectedCode = result.getText()
+              console.log("[v0] Barcode detected (ZXing):", detectedCode)
               setIsScanning(false)
               stopCamera()
               router.push(`/product/${detectedCode}`)
               return
             }
-          } catch (err) {}
+          } catch (err) {
+            if (err && (err as any).name !== "NotFoundException") {
+              console.error("[v0] ZXing decode error:", err)
+            }
+          }
         }
       }
 
@@ -215,12 +228,29 @@ export default function ScanPage() {
         </div>
 
         <p className="absolute bottom-40 z-10 text-white/90 font-medium bg-black/40 px-4 py-2 rounded-full backdrop-blur-sm text-base">
-          {error ? "Camera unavailable" : cameraEnabled ? "Point at barcode..." : "Starting camera..."}
+          {error ? (
+            "Camera unavailable"
+          ) : !cameraEnabled ? (
+            "Starting camera..."
+          ) : scanAttempts > 50 ? (
+            <span className="flex items-center gap-2">
+              <AlertTriangle className="w-4 h-4" />
+              Having trouble? Try manual entry below
+            </span>
+          ) : (
+            "Position barcode in frame..."
+          )}
         </p>
 
         {error && (
-          <div className="absolute top-32 left-4 right-4 z-10 bg-red-500/90 text-white p-4 rounded-xl text-sm">
-            {error}
+          <div className="absolute top-32 left-4 right-4 z-10 bg-red-500/90 text-white p-4 rounded-xl text-sm shadow-lg">
+            <div className="flex items-start gap-3">
+              <AlertTriangle className="w-5 h-5 shrink-0 mt-0.5" />
+              <div>
+                <p className="font-semibold mb-1">Camera Error</p>
+                <p className="text-sm opacity-90">{error}</p>
+              </div>
+            </div>
           </div>
         )}
       </div>
@@ -249,6 +279,18 @@ export default function ScanPage() {
             <ArrowLeft className="w-6 h-6 rotate-180" />
           </button>
         </form>
+
+        {scanAttempts > 50 && (
+          <div className="mb-6 p-4 bg-amber-50 border border-amber-200 rounded-xl">
+            <p className="text-sm text-amber-900 font-semibold mb-1">Scanning Tips</p>
+            <ul className="text-xs text-amber-800 space-y-1">
+              <li>• Ensure good lighting on the barcode</li>
+              <li>• Hold steady and keep barcode flat</li>
+              <li>• Try cleaning the camera lens</li>
+              <li>• Use manual entry if barcode is damaged</li>
+            </ul>
+          </div>
+        )}
 
         <h3 className="text-sm font-bold text-gray-400 uppercase tracking-wider mb-3">Quick Demo Scans</h3>
         <div className="grid grid-cols-2 gap-3">
